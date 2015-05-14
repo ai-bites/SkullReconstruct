@@ -1,6 +1,7 @@
-% CT head test
+%% CT head test
 
 clc; clear all ; close all;
+
 %% Load images
 display('loading images');
 
@@ -17,7 +18,7 @@ im =imread(strcat('./tiff/',files(1).name));
 I=zeros(dim1,dim2,N);
 H = padarray(2,[2 2]) - fspecial('gaussian' ,[5 5],2);
 for i=1:N
-    im = imfilter(imread(strcat('./tiff/',files(i).name)),H);
+    im = imread(strcat('./tiff/',files(i).name));
     I(:,:,i) = im;
 end
 
@@ -48,6 +49,15 @@ for r=1:dim1
         Ivol(r,c,:) = interp1(x,squeeze(I(r,c,:)),xq);
     end
 end
+
+Ivol = Ivol(:,:,end:-1:2);
+dim3 = dim3 - 1;
+Ivol2 = zeros(dim1,dim2, dim3+50);
+Ivol2(:,:,51:end) = Ivol;
+Ivol = Ivol2;
+dim3 = size(Ivol,3);
+
+
 
 %% Try crazy plotting
 
@@ -134,16 +144,28 @@ hold off
 
 %% Generate ellipsoid
 meshres = 50;
-[Xmesh,Ymesh,Zmesh] = ellipsoid(x0,xc,yc,ag,R,bg,meshres);
 
-[XmeshIn,YmeshIn,ZmeshIn] = ellipsoid(x0,xc,yc,ag,R,bg,meshres);
+ellCenterX = x0;
+ellCenterY = xc;
+ellCenterZ = (y0 + yc) /2;
+%ellCenterZ = yc;
+ellRadX = ag;
+ellRadY = R;
+ellRadZ = ((y0+bg+yc+R)/2) - ellCenterZ;
+%ellRadZ = R;
+[XmeshIn,YmeshIn,ZmeshIn] = ellipsoid(ellCenterX,ellCenterY,ellCenterZ, ...
+                                        ellRadX,ellRadY,ellRadZ,meshres);
 XmeshIn = XmeshIn(1:ceil(meshres/2)+1,:);
 YmeshIn = YmeshIn(1:ceil(meshres/2)+1,:);
 ZmeshIn = ZmeshIn(1:ceil(meshres/2)+1,:);
 XmeshOut = XmeshIn;
 YmeshOut = YmeshIn;
 ZmeshOut = ZmeshIn;
-figure
+
+
+%% Validate ellipsoid
+
+fh = figure
 
 surf(XmeshIn,YmeshIn,ZmeshIn);
 axis equal
@@ -152,6 +174,22 @@ hold on
 xlabel('x');
 ylabel('y');
 zlabel('z');
+
+view([0 0]);
+h = gca;
+F = getframe(h);
+projLat = F.cdata;
+
+
+scale = size(DRRlateral, 1)/size(projLat,1);
+projLat=imresize(projLat, scale);
+
+projLat=projLat(:,1:dim1,:);
+projLat = projLat(end:-1:1,:,:);
+projLat = mat2gray(rgb2gray(projLat));
+checkLat = (1-projLat)*0.05+mat2gray(DRRlateral)*2;
+figure; imshow(checkLat,[])
+
 %surfnorm(Xmesh,Ymesh,Zmesh);
 
 %% Debugging stuff
@@ -178,18 +216,22 @@ zlabel('z');
 
 [parallelN, meridianN] = size(XmeshIn);
 
-parallel = 20;
-threshPercent = 0.8;
+%parallel = 10;
 
-for meridian=10:30
+threshPercent = 0.8;
+%figure
+for iters=1:20
+for parallel=1:parallelN
+for meridian=1:meridianN
     
-    p = [XmeshIn(parallel,meridian),YmeshIn(parallel,meridian),ZmeshIn(parallel,meridian)];
+    p = [XmeshIn(parallel,meridian),YmeshIn(parallel,meridian), ...
+         ZmeshIn(parallel,meridian)];
     n = [Nx(parallel,meridian),Ny(parallel,meridian),Nz(parallel,meridian)];
 
     idx = 1;
     pline = [];
     Icurr = [];
-    soiLength = 70;
+    soiLength = 30;
     for i=-soiLength:soiLength
         pline(idx,:) = p+i*n;
         Icurr(idx) = Ivol(round(pline(idx,1)),round(pline(idx,2)),round(pline(idx,3)));
@@ -223,36 +265,38 @@ for meridian=10:30
     % plot profile for debugging
     %figure
     %plot(IcurrCropped);
-    figure
-    plot(Icurr);
-    hold on
-    plot(minIdx,Icurr(minIdx),'rx');
-    plot(maxIdx,Icurr(maxIdx),'rx');
-    title(strcat(num2str(parallel),',',num2str(meridian)))
+    
+    %plot(Icurr);
+    %hold on
+    %plot(minIdx,Icurr(minIdx),'rx');
+    %plot(maxIdx,Icurr(maxIdx),'rx');
+    %title(strcat(num2str(parallel),',',num2str(meridian)))
+    %waitforbuttonpress
+    %clf
+end
+end
 end
 
 %Icurr = interp3(Xgrid,Ygrid,Zgrid,Ivol,pline(:,1),pline(:,2),pline(:,3));
 figure
+plot(XmeshIn(parallel, :),YmeshIn(parallel, :));
+hold on;
+plot(XmeshOut(parallel, :),YmeshOut(parallel, :));
+labels = cellstr( num2str([1:meridianN]'));
+text(XmeshOut(parallel, :),YmeshOut(parallel, :), labels);
 
-surf(XmeshIn,YmeshIn,ZmeshIn);
+
+figure
+surf(XmeshIn,YmeshIn,dim3-ZmeshIn);
 axis equal
 axis([1 dim2 1 dim1 1 dim3]);
 hold on
 xlabel('x');
 ylabel('y');
 zlabel('z');
-figure
 
-surf(XmeshOut,YmeshOut,ZmeshOut);
+hold on
+surf(XmeshOut,YmeshOut,dim3-ZmeshOut);
 
 %% Find edges
-
-
-
-
-
-
-
-
-
 
