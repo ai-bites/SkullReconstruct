@@ -52,27 +52,17 @@ end
 
 Ivol = Ivol(:,:,end:-1:2);
 dim3 = dim3 - 1;
-Ivol2 = zeros(dim1,dim2, dim3+50);
-Ivol2(:,:,51:end) = Ivol;
+Ivol2 = zeros(dim1,dim2, dim3+70);
+for i=1:45
+    Ivol2(:,:,i) = Ivol(:,:,1);
+end
+Ivol2(:,:,46:46+dim3-1) = Ivol;
+for i=dim3+46:dim3+70
+    Ivol2(:,:,i) = Ivol(:,:,end);
+end
 Ivol = Ivol2;
 dim3 = size(Ivol,3);
 
-
-
-%% Try crazy plotting
-
-% figure;
-% for r=1:m
-%     for c=1:n
-%         for d=1:Nnew  %d: depth
-%             pint = Ivol(r,c,d);
-%             if pint > 0.7
-%                 plot3(r,c,d,'b.');
-%                 hold on;
-%             end
-%         end
-%     end
-% end
 
 %% Get top DRR
 
@@ -125,17 +115,24 @@ title('lateral DRR');
 
 [xlateral, ylateral] = extractContour(DRRlateral, 10);
 
+%% Rotate points for fitting
+theta = -35;
+[xlateral ylateral] =rot2d(theta,xlateral,ylateral)
+
 %% Fit ellipse
+
 [ag, bg, x0, y0, phi] = ellipsefit(xlateral,ylateral);
+[x0_unrot, y0_unrot] = rot2d(-theta,x0,y0)
 hold on
 axis equal
-plotellipse([x0;y0], ag, bg, phi, 'k');
+plotellipse([x0_unrot;y0_unrot], max(ag,bg), min(ag,bg), theta, 'k');
 hold off
 
 %% Prompt for frontal points
 [xfrontal, yfrontal] = extractContour(DRRfrontal, 10);
 
 %% Fit circle
+
 [xc,yc,R] = circfit(xfrontal,yfrontal)
 hold on
 axis equal
@@ -143,21 +140,25 @@ plotcircle(xc,yc,R);
 hold off
 
 %% Generate ellipsoid
-meshres = 50;
+
+meshres = 100;
 
 ellCenterX = x0;
 ellCenterY = xc;
-ellCenterZ = (y0 + yc) /2;
-%ellCenterZ = yc;
+%ellCenterZ = (y0 + yc) /2;
+ellCenterZ = y0;
 ellRadX = ag;
 ellRadY = R;
-ellRadZ = ((y0+bg+yc+R)/2) - ellCenterZ;
-%ellRadZ = R;
+%ellRadZ = ((y0+bg+yc+R)/2) - ellCenterZ;
+ellRadZ = bg;
 [XmeshIn,YmeshIn,ZmeshIn] = ellipsoid(ellCenterX,ellCenterY,ellCenterZ, ...
                                         ellRadX,ellRadY,ellRadZ,meshres);
-XmeshIn = XmeshIn(1:ceil(meshres/2)+1,:);
-YmeshIn = YmeshIn(1:ceil(meshres/2)+1,:);
-ZmeshIn = ZmeshIn(1:ceil(meshres/2)+1,:);
+XmeshIn = XmeshIn(1:ceil(meshres/2),:);
+YmeshIn = YmeshIn(1:ceil(meshres/2),:);
+ZmeshIn = ZmeshIn(1:ceil(meshres/2),:);
+
+[XmeshIn YmeshIn ZmeshIn] =rot3d(-theta,XmeshIn,YmeshIn,ZmeshIn);
+
 XmeshOut = XmeshIn;
 YmeshOut = YmeshIn;
 ZmeshOut = ZmeshIn;
@@ -180,32 +181,23 @@ h = gca;
 F = getframe(h);
 projLat = F.cdata;
 
-
 scale = size(DRRlateral, 1)/size(projLat,1);
 projLat=imresize(projLat, scale);
-
-projLat=projLat(:,1:dim1,:);
-projLat = projLat(end:-1:1,:,:);
 projLat = mat2gray(rgb2gray(projLat));
-checkLat = (1-projLat)*0.05+mat2gray(DRRlateral)*2;
+[pLatM, pLatN] = size(projLat);
+[DRRM, DRRN] = size(DRRlateral);
+
+projLat2 = zeros(size(DRRlateral));
+projLat2(1:min(pLatM,DRRM),1:min(pLatN,DRRN)) = projLat(1:min(pLatM,DRRM),1:min(pLatN,DRRN));
+projLat = projLat2;
+
+%projLat=projLat(:,1:dim1,:);
+projLat = projLat(end:-1:1,:,:);
+
+checkLat = (1-projLat)*0.5+mat2gray(DRRlateral)*2;
 figure; imshow(checkLat,[])
 
 %surfnorm(Xmesh,Ymesh,Zmesh);
-
-%% Debugging stuff
-
-%figure;
-%topX = XmeshIn(51,1:26);
-%topY = YmeshIn(51,1:26);
-%topZ = ZmeshIn(51,1:26);
-
-%plot3(topX,topY,topZ);
-%axis equal
-
-%slice = squeeze(Ivol(round(XmeshIn(parallel,meridian)),:,:));
-%slice = slice';
-%figure;
-%imshow(slice,[]);
 
 
 %% Compute intensities along normals
@@ -286,8 +278,24 @@ labels = cellstr( num2str([1:meridianN]'));
 text(XmeshOut(parallel, :),YmeshOut(parallel, :), labels);
 
 
+distMap = sqrt((XmeshIn - XmeshOut).^2 + ...
+    (YmeshIn - YmeshOut).^2 + (ZmeshIn - ZmeshOut).^2);
+
 figure
-surf(XmeshIn,YmeshIn,dim3-ZmeshIn);
+surf(XmeshIn,YmeshIn,dim3-ZmeshIn,distMap,'EdgeColor','none','LineStyle','none');
+hold on
+surf(XmeshOut,YmeshOut,dim3-ZmeshOut,distMap);
+axis equal
+axis([1 dim2 1 dim1 1 dim3]);
+xlabel('x');
+ylabel('y');
+zlabel('z');
+
+%% Validation after solution
+
+fh = figure
+
+surf(XmeshIn,YmeshIn,ZmeshIn);
 axis equal
 axis([1 dim2 1 dim1 1 dim3]);
 hold on
@@ -295,8 +303,66 @@ xlabel('x');
 ylabel('y');
 zlabel('z');
 
-hold on
-surf(XmeshOut,YmeshOut,dim3-ZmeshOut);
+view([0 0]);
+h = gca;
+F = getframe(h);
+projLat = F.cdata;
 
-%% Find edges
+scale = size(DRRlateral, 1)/size(projLat,1);
+projLat=imresize(projLat, scale);
+projLat = mat2gray(rgb2gray(projLat));
+[pLatM, pLatN] = size(projLat);
+[DRRM, DRRN] = size(DRRlateral);
+
+projLat2 = zeros(size(DRRlateral));
+projLat2(1:min(pLatM,DRRM),1:min(pLatN,DRRN)) = projLat(1:min(pLatM,DRRM),1:min(pLatN,DRRN));
+projLat = projLat2;
+
+%projLat=projLat(:,1:dim1,:);
+projLat = projLat(end:-1:1,:,:);
+
+innerProj = (1-projLat);
+
+%checkLat = (1-projLat)*0.5+mat2gray(DRRlateral)*2;
+%figure; imshow(checkLat,[])
+
+%% Validation after solution
+
+fh = figure
+
+surf(XmeshOut,YmeshOut,ZmeshOut);
+axis equal
+axis([1 dim2 1 dim1 1 dim3]);
+hold on
+xlabel('x');
+ylabel('y');
+zlabel('z');
+
+view([0 0]);
+h = gca;
+F = getframe(h);
+projLat = F.cdata;
+
+scale = size(DRRlateral, 1)/size(projLat,1);
+projLat=imresize(projLat, scale);
+projLat = mat2gray(rgb2gray(projLat));
+[pLatM, pLatN] = size(projLat);
+[DRRM, DRRN] = size(DRRlateral);
+
+projLat2 = zeros(size(DRRlateral));
+projLat2(1:min(pLatM,DRRM),1:min(pLatN,DRRN)) = projLat(1:min(pLatM,DRRM),1:min(pLatN,DRRN));
+projLat = projLat2;
+
+%projLat=projLat(:,1:dim1,:);
+projLat = projLat(end:-1:1,:,:);
+
+outerProj = (1-projLat);
+
+%checkLat = (1-projLat)*0.5+mat2gray(DRRlateral)*2;
+checkLat = zeros(DRRM,DRRN,3);
+checkLat(:,:,1) = mat2gray( outerProj*0.2 + mat2gray(DRRlateral)*2);
+checkLat(:,:,2) = mat2gray( innerProj*0.2 + mat2gray(DRRlateral)*2);
+checkLat(:,:,3) = mat2gray( mat2gray(DRRlateral)*2);
+
+figure; imshow( checkLat,[])
 

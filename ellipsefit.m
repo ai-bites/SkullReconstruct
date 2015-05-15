@@ -94,8 +94,11 @@ a_prime = sqrt(nom/(delta* ( (c-a)*s -(c+a))));
 
 b_prime = sqrt(nom/(delta* ( (a-c)*s -(c+a))));
 
-semimajor_axis = max(a_prime, b_prime);
-semiminor_axis = min(a_prime, b_prime);
+%semimajor_axis = max(a_prime, b_prime);
+%semiminor_axis = min(a_prime, b_prime);
+
+semimajor_axis = a_prime;
+semiminor_axis = b_prime;
 
 if (a_prime < b_prime)
     phi = pi/2 - phi;
