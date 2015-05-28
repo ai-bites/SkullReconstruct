@@ -255,16 +255,16 @@ for iters=1:20
             ZmeshOut(parallel,meridian) = pRight(3);
 
             % plot profile for debugging
-            %figure
-            %plot(IcurrCropped);
-
-            %plot(Icurr);
-            %hold on
-            %plot(minIdx,Icurr(minIdx),'rx');
-            %plot(maxIdx,Icurr(maxIdx),'rx');
-            %title(strcat(num2str(parallel),',',num2str(meridian)))
-            %waitforbuttonpress
-            %clf
+            % figure
+%             plot(IcurrCropped);
+% 
+%             plot(Icurr);
+%             hold on
+%             plot(minIdx,Icurr(minIdx),'rx');
+%             plot(maxIdx,Icurr(maxIdx),'rx');
+%             title(strcat(num2str(parallel),',',num2str(meridian)))
+%             waitforbuttonpress
+%             clf
         end
     end
 end
